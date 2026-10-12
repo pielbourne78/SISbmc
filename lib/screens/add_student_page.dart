@@ -15,6 +15,52 @@ class _AddStudentPageState extends State<AddStudentPage> {
   final yearController = TextEditingController();
   final emailController = TextEditingController();
 
+  bool _saveStudent() {
+    final name = nameController.text.trim();
+    final course = courseController.text.trim();
+    final email = emailController.text.trim();
+    final yearLevel = int.tryParse(yearController.text.trim());
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Name is required.')),
+      );
+      return false;
+    }
+
+    if (course.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Course is required.')),
+      );
+      return false;
+    }
+
+    if (yearLevel == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid year level.')),
+      );
+      return false;
+    }
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email is required.')),
+      );
+      return false;
+    }
+
+    final student = Student(
+      id: DateTime.now().millisecondsSinceEpoch,
+      name: name,
+      course: course,
+      yearLevel: yearLevel,
+      email: email,
+    );
+
+    Navigator.pop(context, student);
+    return true;
+  }
+
   @override
   void dispose() {
     nameController.dispose();
@@ -66,27 +112,7 @@ class _AddStudentPageState extends State<AddStudentPage> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () {
-                final yearLevel = int.tryParse(yearController.text);
-                if (yearLevel == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter a valid year level.'),
-                    ),
-                  );
-                  return;
-                }
-
-                final student = Student(
-                  id: DateTime.now().millisecondsSinceEpoch,
-                  name: nameController.text,
-                  course: courseController.text,
-                  yearLevel: yearLevel,
-                  email: emailController.text,
-                );
-
-                Navigator.pop(context, student);
-              },
+              onPressed: _saveStudent,
               child: const Text('Save Student'),
             ),
           ],
@@ -95,3 +121,4 @@ class _AddStudentPageState extends State<AddStudentPage> {
     );
   }
 }
+
