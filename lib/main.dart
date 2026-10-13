@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'models/student.dart';
 import 'screens/add_student_page.dart';
 import 'screens/student_details_page.dart';
+import 'services/student_storage.dart';
 
 void main() {
   runApp(const StudentInformationSystem());
@@ -30,7 +31,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final TextEditingController searchController = TextEditingController();
-  List<Student> students = [
+  final List<Student> _initialStudents = [
     Student(
       id: 1,
       name: 'Juan Dela Cruz',
@@ -46,12 +47,46 @@ class _HomePageState extends State<HomePage> {
       email: 'maria@example.com',
     ),
   ];
+  List<Student> students = [];
   List<Student> filteredStudents = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    filteredStudents = students;
+    _loadStudents();
+  }
+
+  Future<void> _loadStudents() async {
+    final storedStudents = await StudentStorage.loadStudents(
+      initialStudents: _initialStudents,
+    );
+    if (!mounted) return;
+
+    setState(() {
+      students = storedStudents;
+      filteredStudents = _filterStudents(searchController.text);
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveStudents(List<Student> updatedStudents) async {
+    try {
+      await StudentStorage.saveStudents(updatedStudents);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save student changes.')),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      students = updatedStudents;
+      filteredStudents = _filterStudents(searchController.text);
+    });
   }
 
   List<Student> _filterStudents(String query) {
@@ -93,10 +128,10 @@ class _HomePageState extends State<HomePage> {
     );
 
     if (confirmed == true && mounted) {
-      setState(() {
-        students.removeWhere((item) => item.id == student.id);
-        filteredStudents = _filterStudents(searchController.text);
-      });
+      final updatedStudents = students
+          .where((item) => item.id != student.id)
+          .toList();
+      await _saveStudents(updatedStudents);
     }
   }
 
@@ -123,7 +158,9 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: Column(
+        body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
@@ -169,21 +206,16 @@ class _HomePageState extends State<HomePage> {
                             );
 
                             if (updatedStudent != null && mounted) {
-                              setState(() {
-                                final indexOfStudent = students.indexWhere(
-                                  (item) => item.id == updatedStudent.id,
-                                );
-
-                                if (indexOfStudent != -1) {
-                                  students[indexOfStudent] = updatedStudent;
-                                } else {
-                                  students.add(updatedStudent);
-                                }
-
-                                filteredStudents = _filterStudents(
-                                  searchController.text,
-                                );
-                              });
+                              final updatedStudents = [...students];
+                              final indexOfStudent = updatedStudents.indexWhere(
+                                (item) => item.id == updatedStudent.id,
+                              );
+                              if (indexOfStudent != -1) {
+                                updatedStudents[indexOfStudent] = updatedStudent;
+                              } else {
+                                updatedStudents.add(updatedStudent);
+                              }
+                              await _saveStudents(updatedStudents);
                             }
                           },
                         ),
@@ -202,19 +234,16 @@ class _HomePageState extends State<HomePage> {
                       );
 
                       if (updatedStudent != null && mounted) {
-                        setState(() {
-                          final indexOfStudent = students.indexWhere(
-                            (item) => item.id == updatedStudent.id,
-                          );
-
-                          if (indexOfStudent != -1) {
-                            students[indexOfStudent] = updatedStudent;
-                          } else {
-                            students.add(updatedStudent);
-                          }
-
-                          filteredStudents = _filterStudents(searchController.text);
-                        });
+                        final updatedStudents = [...students];
+                        final indexOfStudent = updatedStudents.indexWhere(
+                          (item) => item.id == updatedStudent.id,
+                        );
+                        if (indexOfStudent != -1) {
+                          updatedStudents[indexOfStudent] = updatedStudent;
+                        } else {
+                          updatedStudents.add(updatedStudent);
+                        }
+                        await _saveStudents(updatedStudents);
                       }
                     },
                   );
@@ -224,17 +253,14 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
+        onPressed: _isLoading ? null : () async {
           final student = await Navigator.push<Student>(
             context,
             MaterialPageRoute(builder: (context) => const AddStudentPage()),
           );
 
           if (student != null && mounted) {
-            setState(() {
-              students.add(student);
-              filteredStudents = _filterStudents(searchController.text);
-            });
+            await _saveStudents([...students, student]);
           }
         },
         child: const Icon(Icons.add),
